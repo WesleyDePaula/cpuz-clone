@@ -9,6 +9,9 @@
 #include "cpu/cpu_cores.h"
 #include "cpu/cpu_cache.h"
 #include "cpu/cpu_clock.h"
+#include "mainboard/mainboard_basic.h"
+#include "mainboard/mainboard_chipset.h"
+#include "mainboard/mainboard_bios.h"
 
 #pragma comment(lib, "comctl32.lib")
 
@@ -33,20 +36,40 @@ enum {
     DC_LBL_C2,       IDC_BOX_C2_SIZE, IDC_BOX_C2_ASSOC,
     DC_LBL_C3,       IDC_BOX_C3_SIZE, IDC_BOX_C3_ASSOC,
 
+    // Mainboard tab groups
+    IDC_GRP_MOBO = 500, IDC_GRP_BIOS = 501,
+
+    // Motherboard
+    IDC_LBL_MANU = 550, IDC_BOX_MANU,
+    IDC_LBL_MODEL,      IDC_BOX_MODEL,
+    IDC_LBL_BUS,        IDC_BOX_BUS,
+
+    // Chipset (até 2 linhas): label + VENDOR + MODEL + REVISION
+    IDC_LBL_CS0 = 600, IDC_BOX_CS0_VENDOR, IDC_BOX_CS0_MODEL, IDC_BOX_CS0_REV,
+    IDC_LBL_CS1,       IDC_BOX_CS1_VENDOR, IDC_BOX_CS1_MODEL, IDC_BOX_CS1_REV,
+
+    // BIOS
+    IDC_LBL_BIOS_BRAND = 650, IDC_BOX_BIOS_BRAND,
+    IDC_LBL_BIOS_VER,         IDC_BOX_BIOS_VER,
+    IDC_LBL_BIOS_DATE,        IDC_BOX_BIOS_DATE,
+
 };
 
-static const wchar_t* APP_TITLE = L"Mini CPU-Z (demo)";
+static const wchar_t* APP_TITLE = L"Ultra Mega Blaster Alpha Hardware Info: Ultimate 2025 Edition XYZ";
 static const wchar_t* WC_MAIN   = L"CPUZ_DEMO_CLASS";
 
 // Controles globais
 static HWND hTab;
+// CPU tab
 static HWND hGroupProc, hGroupClock, hGroupCache;
-// Processor
 static HWND hLblVendor, hBoxVendor, hLblName, hBoxName, hLblPhys, hBoxPhys, hLblLogi, hBoxLogi;
-// Clocks
 static HWND hLblClkCur, hBoxClkCur, hLblClkMax, hBoxClkMax, hLblClkLim, hBoxClkLim;
-// Cache
 static HWND hLblCache[4], hBoxCacheSize[4], hBoxCacheAssoc[4];
+// Mainboard tab
+static HWND hGroupMobo, hGroupBios;
+static HWND hLblManu, hBoxManu, hLblModel, hBoxModel, hLblBus, hBoxBus;
+static HWND hLblChipset[2], hBoxChipsetVendor[2], hBoxChipsetModel[2], hBoxChipsetRev[2];
+static HWND hLblBiosBrand, hBoxBiosBrand, hLblBiosVer, hBoxBiosVer, hLblBiosDate, hBoxBiosDate;
 
 static void CreateTabs(HWND hwnd) {
     hTab = CreateWindowExW(0, WC_TABCONTROLW, L"", WS_CHILD|WS_CLIPSIBLINGS|WS_VISIBLE,
@@ -76,6 +99,24 @@ static void DestroyCpuControls(void) {
     hGroupProc=hGroupClock=hGroupCache=NULL;
     hLblVendor=hBoxVendor=hLblName=hBoxName=hLblPhys=hBoxPhys=hLblLogi=hBoxLogi=NULL;
     hLblClkCur=hBoxClkCur=hLblClkMax=hBoxClkMax=hLblClkLim=hBoxClkLim=NULL;
+}
+
+static void DestroyMainboardControls(void) {
+    HWND arr[] = {
+        hLblManu, hBoxManu, hLblModel, hBoxModel, hLblBus, hBoxBus,
+        hLblChipset[0], hBoxChipsetVendor[0], hBoxChipsetModel[0], hBoxChipsetRev[0],
+        hLblChipset[1], hBoxChipsetVendor[1], hBoxChipsetModel[1], hBoxChipsetRev[1],
+        hLblBiosBrand, hBoxBiosBrand, hLblBiosVer, hBoxBiosVer, hLblBiosDate, hBoxBiosDate,
+        hGroupMobo, hGroupBios
+    };
+    for (int i=0;i<(int)(sizeof(arr)/sizeof(arr[0]));++i) if (arr[i]) DestroyWindow(arr[i]);
+    ZeroMemory(&hLblChipset, sizeof(hLblChipset));
+    ZeroMemory(&hBoxChipsetVendor, sizeof(hBoxChipsetVendor));
+    ZeroMemory(&hBoxChipsetModel, sizeof(hBoxChipsetModel));
+    ZeroMemory(&hBoxChipsetRev, sizeof(hBoxChipsetRev));
+    hGroupMobo=hGroupBios=NULL;
+    hLblManu=hBoxManu=hLblModel=hBoxModel=hLblBus=hBoxBus=NULL;
+    hLblBiosBrand=hBoxBiosBrand=hLblBiosVer=hBoxBiosVer=hLblBiosDate=hBoxBiosDate=NULL;
 }
 
 static void Layout(HWND hwnd) {
@@ -135,11 +176,11 @@ static void Layout(HWND hwnd) {
 }
 
 static void ShowBlankTab(HWND hwnd) {
-    DestroyCpuControls(); // tela vazia por enquanto
+    DestroyCpuControls();
+    DestroyMainboardControls();
 }
 
 static void ShowCpuTab(HWND hwnd) {
-    DestroyCpuControls();
 
     // group boxes
     hGroupProc  = CreateWindowExW(0,L"BUTTON",L"Processor",WS_CHILD|WS_VISIBLE|BS_GROUPBOX,0,0,0,0,hwnd,(HMENU)IDC_GRP_PROC,GetModuleHandle(NULL),NULL);
@@ -226,9 +267,184 @@ static void ShowCpuTab(HWND hwnd) {
     }
 }
 
+static void ShowMainboardTab(HWND hwnd) {
+    DestroyCpuControls();
+    DestroyMainboardControls();
+
+    // group boxes
+    hGroupMobo = CreateWindowExW(0,L"BUTTON",L"Motherboard",WS_CHILD|WS_VISIBLE|BS_GROUPBOX,0,0,0,0,hwnd,(HMENU)IDC_GRP_MOBO,GetModuleHandle(NULL),NULL);
+    hGroupBios = CreateWindowExW(0,L"BUTTON",L"BIOS",WS_CHILD|WS_VISIBLE|BS_GROUPBOX,0,0,0,0,hwnd,(HMENU)IDC_GRP_BIOS,GetModuleHandle(NULL),NULL);
+
+    // Motherboard — labels + caixas
+    hLblManu  = CreateWindowExW(0,L"STATIC",L"Manufacturer",WS_CHILD|WS_VISIBLE|SS_LEFT,0,0,0,0,hwnd,(HMENU)IDC_LBL_MANU,GetModuleHandle(NULL),NULL);
+    hBoxManu  = CreateWindowExW(WS_EX_CLIENTEDGE,L"EDIT",L"",WS_CHILD|WS_VISIBLE|ES_READONLY,0,0,0,0,hwnd,(HMENU)IDC_BOX_MANU,GetModuleHandle(NULL),NULL);
+
+    hLblModel = CreateWindowExW(0,L"STATIC",L"Model",WS_CHILD|WS_VISIBLE|SS_LEFT,0,0,0,0,hwnd,(HMENU)IDC_LBL_MODEL,GetModuleHandle(NULL),NULL);
+    hBoxModel = CreateWindowExW(WS_EX_CLIENTEDGE,L"EDIT",L"",WS_CHILD|WS_VISIBLE|ES_READONLY,0,0,0,0,hwnd,(HMENU)IDC_BOX_MODEL,GetModuleHandle(NULL),NULL);
+
+    hLblBus   = CreateWindowExW(0,L"STATIC",L"Bus Specs.",WS_CHILD|WS_VISIBLE|SS_LEFT,0,0,0,0,hwnd,(HMENU)IDC_LBL_BUS,GetModuleHandle(NULL),NULL);
+    hBoxBus   = CreateWindowExW(WS_EX_CLIENTEDGE,L"EDIT",L"",WS_CHILD|WS_VISIBLE|ES_READONLY,0,0,0,0,hwnd,(HMENU)IDC_BOX_BUS,GetModuleHandle(NULL),NULL);
+
+    // Chipset — 2 linhas: label + [VENDOR box] + [MODEL box] + [REV box]
+    for (int i=0;i<2;i++) {
+        hLblChipset[i]       = CreateWindowExW(0,L"STATIC",L"",WS_CHILD|WS_VISIBLE|SS_LEFT,
+                                               0,0,0,0, hwnd,(HMENU)(IDC_LBL_CS0 + i*4), GetModuleHandle(NULL),NULL);
+        hBoxChipsetVendor[i] = CreateWindowExW(WS_EX_CLIENTEDGE,L"EDIT",L"",WS_CHILD|WS_VISIBLE|ES_READONLY,
+                                               0,0,0,0, hwnd,(HMENU)(IDC_BOX_CS0_VENDOR + i*4), GetModuleHandle(NULL),NULL);
+        hBoxChipsetModel[i]  = CreateWindowExW(WS_EX_CLIENTEDGE,L"EDIT",L"",WS_CHILD|WS_VISIBLE|ES_READONLY,
+                                               0,0,0,0, hwnd,(HMENU)(IDC_BOX_CS0_MODEL + i*4), GetModuleHandle(NULL),NULL);
+        hBoxChipsetRev[i]    = CreateWindowExW(WS_EX_CLIENTEDGE,L"EDIT",L"",WS_CHILD|WS_VISIBLE|ES_READONLY,
+                                               0,0,0,0, hwnd,(HMENU)(IDC_BOX_CS0_REV + i*4), GetModuleHandle(NULL),NULL);
+    }
+
+    // BIOS — labels + caixas
+    hLblBiosBrand = CreateWindowExW(0,L"STATIC",L"Brand",WS_CHILD|WS_VISIBLE|SS_LEFT,0,0,0,0,hwnd,(HMENU)IDC_LBL_BIOS_BRAND,GetModuleHandle(NULL),NULL);
+    hBoxBiosBrand = CreateWindowExW(WS_EX_CLIENTEDGE,L"EDIT",L"",WS_CHILD|WS_VISIBLE|ES_READONLY,0,0,0,0,hwnd,(HMENU)IDC_BOX_BIOS_BRAND,GetModuleHandle(NULL),NULL);
+
+    hLblBiosVer   = CreateWindowExW(0,L"STATIC",L"Version",WS_CHILD|WS_VISIBLE|SS_LEFT,0,0,0,0,hwnd,(HMENU)IDC_LBL_BIOS_VER,GetModuleHandle(NULL),NULL);
+    hBoxBiosVer   = CreateWindowExW(WS_EX_CLIENTEDGE,L"EDIT",L"",WS_CHILD|WS_VISIBLE|ES_READONLY,0,0,0,0,hwnd,(HMENU)IDC_BOX_BIOS_VER,GetModuleHandle(NULL),NULL);
+
+    hLblBiosDate  = CreateWindowExW(0,L"STATIC",L"Date",WS_CHILD|WS_VISIBLE|SS_LEFT,0,0,0,0,hwnd,(HMENU)IDC_LBL_BIOS_DATE,GetModuleHandle(NULL),NULL);
+    hBoxBiosDate  = CreateWindowExW(WS_EX_CLIENTEDGE,L"EDIT",L"",WS_CHILD|WS_VISIBLE|ES_READONLY,0,0,0,0,hwnd,(HMENU)IDC_BOX_BIOS_DATE,GetModuleHandle(NULL),NULL);
+
+    // Layout
+    RECT rc; GetClientRect(hwnd, &rc);
+    int margin=8, tabH=28;
+    int areaX=margin, areaY=margin+tabH+6;
+    int areaW=rc.right-2*margin, areaH=rc.bottom-areaY-margin;
+    int grpH=(areaH-margin)/2;
+
+    // Dois grupos: Motherboard (em cima) e BIOS (embaixo)
+    MoveWindow(hGroupMobo, areaX, areaY, areaW, grpH, TRUE);
+    MoveWindow(hGroupBios, areaX, areaY+grpH+margin, areaW, grpH, TRUE);
+
+    int padX=12, padY=22, rowH=24, lblW=130, boxW=320, boxH=20;
+    int leftX = areaX + padX;
+    int baseY = areaY + padY;
+
+    // Motherboard (3 linhas)
+    MoveWindow(hLblManu,  leftX, baseY+0*rowH, lblW, boxH, TRUE);
+    MoveWindow(hBoxManu,  leftX+lblW+6, baseY+0*rowH, boxW, boxH, TRUE);
+
+    MoveWindow(hLblModel, leftX, baseY+1*rowH, lblW, boxH, TRUE);
+    MoveWindow(hBoxModel, leftX+lblW+6, baseY+1*rowH, boxW, boxH, TRUE);
+
+    MoveWindow(hLblBus,   leftX, baseY+2*rowH, lblW, boxH, TRUE);
+    MoveWindow(hBoxBus,   leftX+lblW+6, baseY+2*rowH, boxW, boxH, TRUE);
+
+    // Chipset (2 linhas: três caixas por linha - vendor, model, revision)
+    int chipBaseY = baseY + 4*rowH; // espaço após as 3 linhas do motherboard + uma linha de separação
+    int vendorBoxW = 100;
+    int modelBoxW = 140;
+    int revBoxW = 70;
+    for (int i=0;i<2;i++) {
+        MoveWindow(hLblChipset[i],       leftX, chipBaseY + i*rowH, lblW, boxH, TRUE);
+        MoveWindow(hBoxChipsetVendor[i], leftX + lblW + 6, chipBaseY + i*rowH, vendorBoxW, boxH, TRUE);
+        MoveWindow(hBoxChipsetModel[i],  leftX + lblW + 6 + vendorBoxW + 6, chipBaseY + i*rowH, modelBoxW, boxH, TRUE);
+        MoveWindow(hBoxChipsetRev[i],    leftX + lblW + 6 + vendorBoxW + 6 + modelBoxW + 6, chipBaseY + i*rowH, revBoxW, boxH, TRUE);
+    }
+
+    // BIOS (3 linhas)
+    int biosBaseY = areaY + grpH + margin + padY;
+    MoveWindow(hLblBiosBrand, leftX, biosBaseY+0*rowH, lblW, boxH, TRUE);
+    MoveWindow(hBoxBiosBrand, leftX+lblW+6, biosBaseY+0*rowH, boxW, boxH, TRUE);
+
+    MoveWindow(hLblBiosVer,   leftX, biosBaseY+1*rowH, lblW, boxH, TRUE);
+    MoveWindow(hBoxBiosVer,   leftX+lblW+6, biosBaseY+1*rowH, boxW, boxH, TRUE);
+
+    MoveWindow(hLblBiosDate,  leftX, biosBaseY+2*rowH, lblW, boxH, TRUE);
+    MoveWindow(hBoxBiosDate,  leftX+lblW+6, biosBaseY+2*rowH, boxW, boxH, TRUE);
+
+    // Preencher Motherboard
+    char manuA[128]={0};
+    if (get_motherboard_manufacturer(manuA, sizeof(manuA))) {
+        wchar_t manuW[128];
+        mbstowcs(manuW, manuA, 127);
+        manuW[127]=L'\0';
+        SetWindowTextW(hBoxManu, manuW);
+    } else {
+        SetWindowTextW(hBoxManu, L"Unknown");
+    }
+
+    char modelA[128]={0};
+    if (get_motherboard_model(modelA, sizeof(modelA))) {
+        wchar_t modelW[128];
+        mbstowcs(modelW, modelA, 127);
+        modelW[127]=L'\0';
+        SetWindowTextW(hBoxModel, modelW);
+    } else {
+        SetWindowTextW(hBoxModel, L"Unknown");
+    }
+
+    char busA[128]={0};
+    if (get_motherboard_bus_specs(busA, sizeof(busA))) {
+        wchar_t busW[128];
+        mbstowcs(busW, busA, 127);
+        busW[127]=L'\0';
+        SetWindowTextW(hBoxBus, busW);
+    } else {
+        SetWindowTextW(hBoxBus, L"Unknown");
+    }
+
+    // Preencher Chipset
+    wchar_t labels[2][32], vendors[2][64], models[2][64], revisions[2][16];
+    size_t n = build_chipset_rows(labels, vendors, models, revisions, 2);
+    for (size_t i=0;i<n && i<2;i++) {
+        SetWindowTextW(hLblChipset[i],       labels[i]);
+        SetWindowTextW(hBoxChipsetVendor[i], vendors[i]);
+        SetWindowTextW(hBoxChipsetModel[i],  models[i]);
+        SetWindowTextW(hBoxChipsetRev[i],    revisions[i]);
+        ShowWindow(hLblChipset[i], SW_SHOW);
+        ShowWindow(hBoxChipsetVendor[i], SW_SHOW);
+        ShowWindow(hBoxChipsetModel[i], SW_SHOW);
+        ShowWindow(hBoxChipsetRev[i], SW_SHOW);
+    }
+    for (size_t i=n;i<2;i++) {
+        ShowWindow(hLblChipset[i], SW_HIDE);
+        ShowWindow(hBoxChipsetVendor[i], SW_HIDE);
+        ShowWindow(hBoxChipsetModel[i], SW_HIDE);
+        ShowWindow(hBoxChipsetRev[i], SW_HIDE);
+    }
+
+    // Preencher BIOS
+    char biosBrandA[128]={0};
+    if (get_bios_brand(biosBrandA, sizeof(biosBrandA))) {
+        wchar_t biosBrandW[128];
+        mbstowcs(biosBrandW, biosBrandA, 127);
+        biosBrandW[127]=L'\0';
+        SetWindowTextW(hBoxBiosBrand, biosBrandW);
+    } else {
+        SetWindowTextW(hBoxBiosBrand, L"Unknown");
+    }
+
+    char biosVerA[128]={0};
+    if (get_bios_version(biosVerA, sizeof(biosVerA))) {
+        wchar_t biosVerW[128];
+        mbstowcs(biosVerW, biosVerA, 127);
+        biosVerW[127]=L'\0';
+        SetWindowTextW(hBoxBiosVer, biosVerW);
+    } else {
+        SetWindowTextW(hBoxBiosVer, L"Unknown");
+    }
+
+    char biosDateA[64]={0};
+    if (get_bios_date(biosDateA, sizeof(biosDateA))) {
+        wchar_t biosDateW[64];
+        mbstowcs(biosDateW, biosDateA, 63);
+        biosDateW[63]=L'\0';
+        SetWindowTextW(hBoxBiosDate, biosDateW);
+    } else {
+        SetWindowTextW(hBoxBiosDate, L"Unknown");
+    }
+}
+
 static void SwitchTab(HWND hwnd, int sel) {
-    if (sel == 0) ShowCpuTab(hwnd);
-    else          ShowBlankTab(hwnd); // Mainboard/Memory/Graphics por enquanto vazias
+    DestroyCpuControls();
+    DestroyMainboardControls();
+
+    if (sel == 0)      ShowCpuTab(hwnd);
+    else if (sel == 1) ShowMainboardTab(hwnd);
+    else               ShowBlankTab(hwnd); // Memory/Graphics por enquanto vazias
     Layout(hwnd);
 }
 
