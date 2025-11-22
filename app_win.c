@@ -1,9 +1,9 @@
-// app_win.c  — GUI com abas (CPU/Mainboard/Memory/Graphics)
 #define _CRT_SECURE_NO_WARNINGS
 #include <windows.h>
 #include <commctrl.h>
 #include <wchar.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "cpu/cpu_basic.h"
 #include "cpu/cpu_cores.h"
@@ -12,6 +12,8 @@
 #include "mainboard/mainboard_basic.h"
 #include "mainboard/mainboard_chipset.h"
 #include "mainboard/mainboard_bios.h"
+#include "memory/memory_general.h"
+#include "memory/memory_timings.h"
 
 #pragma comment(lib, "comctl32.lib")
 
@@ -53,6 +55,18 @@ enum {
     IDC_LBL_BIOS_VER,         IDC_BOX_BIOS_VER,
     IDC_LBL_BIOS_DATE,        IDC_BOX_BIOS_DATE,
 
+    // Memory tab groups
+    IDC_GRP_MEM_GEN = 700, IDC_GRP_MEM_TIM,
+
+    // General memory fields
+    IDC_LBL_MEM_TYPE = 720, IDC_BOX_MEM_TYPE,
+    IDC_LBL_MEM_SIZE,        IDC_BOX_MEM_SIZE,
+    IDC_LBL_MEM_CHANNEL,     IDC_BOX_MEM_CHANNEL,
+    IDC_LBL_MEM_FREQ,        IDC_BOX_MEM_FREQ,
+
+    // Timing fields
+    IDC_LBL_DRAM_FREQ = 730, IDC_BOX_DRAM_FREQ,
+
 };
 
 static const wchar_t* APP_TITLE = L"Ultra Mega Blaster Alpha Hardware Info: Ultimate 2025 Edition XYZ";
@@ -70,6 +84,14 @@ static HWND hGroupMobo, hGroupBios;
 static HWND hLblManu, hBoxManu, hLblModel, hBoxModel, hLblBus, hBoxBus;
 static HWND hLblChipset[2], hBoxChipsetVendor[2], hBoxChipsetModel[2], hBoxChipsetRev[2];
 static HWND hLblBiosBrand, hBoxBiosBrand, hLblBiosVer, hBoxBiosVer, hLblBiosDate, hBoxBiosDate;
+
+    // Memory tab
+    static HWND hGroupMemGeneral;
+    // General memory fields
+    static HWND hLblMemType, hBoxMemType;
+    static HWND hLblMemSize, hBoxMemSize;
+    static HWND hLblMemChannel, hBoxMemChannel;
+    static HWND hLblMemFreq, hBoxMemFreq;
 
 static void CreateTabs(HWND hwnd) {
     hTab = CreateWindowExW(0, WC_TABCONTROLW, L"", WS_CHILD|WS_CLIPSIBLINGS|WS_VISIBLE,
@@ -173,11 +195,125 @@ static void Layout(HWND hwnd) {
         if (hBoxCacheAssoc[i])
             MoveWindow(hBoxCacheAssoc[i], leftX + lblW + 6 + sizeBoxW + 10, cacheBaseY + i*rowH, assocBoxW, boxH, TRUE);
     }
+
+    // Se a aba de memória estiver ativa (grupos de memória criados), posiciona controles
+    if (hGroupMemGeneral) {
+        // Usa um único grupo ocupando toda a área disponível
+        int memGrpH = areaH;
+        MoveWindow(hGroupMemGeneral, areaX, areaY, areaW, memGrpH, TRUE);
+
+        // Coordenadas comuns
+        int memPadX = 12;
+        int memPadY = 22;
+        int memRowH = 24;
+        int memLblW = 130;
+        int memBoxW = 320;
+        int memBoxH = 20;
+
+        int memLeftX = areaX + memPadX;
+        int baseGenY = areaY + memPadY;
+        // Linhas gerais: tipo, tamanho, canais, frequência
+        if (hLblMemType)
+            MoveWindow(hLblMemType,  memLeftX, baseGenY + 0*memRowH, memLblW, memBoxH, TRUE);
+        if (hBoxMemType)
+            MoveWindow(hBoxMemType,  memLeftX + memLblW + 6, baseGenY + 0*memRowH, memBoxW, memBoxH, TRUE);
+
+        if (hLblMemSize)
+            MoveWindow(hLblMemSize,  memLeftX, baseGenY + 1*memRowH, memLblW, memBoxH, TRUE);
+        if (hBoxMemSize)
+            MoveWindow(hBoxMemSize,  memLeftX + memLblW + 6, baseGenY + 1*memRowH, memBoxW, memBoxH, TRUE);
+
+        if (hLblMemChannel)
+            MoveWindow(hLblMemChannel,  memLeftX, baseGenY + 2*memRowH, memLblW, memBoxH, TRUE);
+        if (hBoxMemChannel)
+            MoveWindow(hBoxMemChannel,  memLeftX + memLblW + 6, baseGenY + 2*memRowH, memBoxW, memBoxH, TRUE);
+
+        if (hLblMemFreq)
+            MoveWindow(hLblMemFreq,  memLeftX, baseGenY + 3*memRowH, memLblW, memBoxH, TRUE);
+        if (hBoxMemFreq)
+            MoveWindow(hBoxMemFreq,  memLeftX + memLblW + 6, baseGenY + 3*memRowH, memBoxW, memBoxH, TRUE);
+
+        // Não há painel separado de Timings — referências removidas
+
+    }
+}
+
+// Libera e remove todos os controles da aba de memória.
+static void DestroyMemoryControls(void) {
+    HWND arr[] = {
+        hLblMemType, hBoxMemType, hLblMemSize, hBoxMemSize, hLblMemChannel, hBoxMemChannel, hLblMemFreq, hBoxMemFreq,
+        hGroupMemGeneral
+    };
+    for (int i=0; i<(int)(sizeof(arr)/sizeof(arr[0])); ++i) {
+        if (arr[i]) DestroyWindow(arr[i]);
+    }
+    hGroupMemGeneral = NULL;
+    hLblMemType=hBoxMemType=hLblMemSize=hBoxMemSize=hLblMemChannel=hBoxMemChannel=hLblMemFreq=hBoxMemFreq=NULL;
+}
+
+// Cria os controles da aba de memória e preenche os valores consultando o sistema.
+static void ShowMemoryTab(HWND hwnd) {
+    // Remove outros controles para evitar sobreposição
+    DestroyCpuControls();
+    DestroyMainboardControls();
+    DestroyMemoryControls();
+
+    // Cria grupos
+    hGroupMemGeneral = CreateWindowExW(0, L"BUTTON", L"General", WS_CHILD|WS_VISIBLE|BS_GROUPBOX,
+                                       0,0,0,0, hwnd, (HMENU)IDC_GRP_MEM_GEN, GetModuleHandle(NULL), NULL);
+
+    // Campos gerais
+    hLblMemType    = CreateWindowExW(0, L"STATIC", L"Type",    WS_CHILD|WS_VISIBLE|SS_LEFT, 0,0,0,0, hwnd, (HMENU)IDC_LBL_MEM_TYPE, GetModuleHandle(NULL), NULL);
+    hBoxMemType    = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD|WS_VISIBLE|ES_READONLY, 0,0,0,0, hwnd, (HMENU)IDC_BOX_MEM_TYPE, GetModuleHandle(NULL), NULL);
+
+    hLblMemSize    = CreateWindowExW(0, L"STATIC", L"Size",    WS_CHILD|WS_VISIBLE|SS_LEFT, 0,0,0,0, hwnd, (HMENU)IDC_LBL_MEM_SIZE, GetModuleHandle(NULL), NULL);
+    hBoxMemSize    = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD|WS_VISIBLE|ES_READONLY, 0,0,0,0, hwnd, (HMENU)IDC_BOX_MEM_SIZE, GetModuleHandle(NULL), NULL);
+
+    hLblMemChannel = CreateWindowExW(0, L"STATIC", L"Channel #", WS_CHILD|WS_VISIBLE|SS_LEFT, 0,0,0,0, hwnd, (HMENU)IDC_LBL_MEM_CHANNEL, GetModuleHandle(NULL), NULL);
+    hBoxMemChannel = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD|WS_VISIBLE|ES_READONLY, 0,0,0,0, hwnd, (HMENU)IDC_BOX_MEM_CHANNEL, GetModuleHandle(NULL), NULL);
+
+    hLblMemFreq    = CreateWindowExW(0, L"STATIC", L"DRAM Frequency", WS_CHILD|WS_VISIBLE|SS_LEFT, 0,0,0,0, hwnd, (HMENU)IDC_LBL_MEM_FREQ, GetModuleHandle(NULL), NULL);
+    hBoxMemFreq    = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD|WS_VISIBLE|ES_READONLY, 0,0,0,0, hwnd, (HMENU)IDC_BOX_MEM_FREQ, GetModuleHandle(NULL), NULL);
+
+    // (timings group removed)
+
+
+    // Ajusta posição inicial
+    Layout(hwnd);
+
+    // Preenche campos gerais
+    char tmpA[128];
+    if (get_memory_type(tmpA, sizeof(tmpA))) {
+        wchar_t tmpW[128]; mbstowcs(tmpW, tmpA, 127); tmpW[127] = L'\0';
+        SetWindowTextW(hBoxMemType, tmpW);
+    } else {
+        SetWindowTextW(hBoxMemType, L"Unknown");
+    }
+    if (get_memory_size(tmpA, sizeof(tmpA))) {
+        wchar_t tmpW[128]; mbstowcs(tmpW, tmpA, 127); tmpW[127] = L'\0';
+        SetWindowTextW(hBoxMemSize, tmpW);
+    } else {
+        SetWindowTextW(hBoxMemSize, L"Unknown");
+    }
+    if (get_memory_channels(tmpA, sizeof(tmpA))) {
+        wchar_t tmpW[128]; mbstowcs(tmpW, tmpA, 127); tmpW[127] = L'\0';
+        SetWindowTextW(hBoxMemChannel, tmpW);
+    } else {
+        SetWindowTextW(hBoxMemChannel, L"Unknown");
+    }
+    if (get_dram_frequency(tmpA, sizeof(tmpA))) {
+        wchar_t tmpW[128]; mbstowcs(tmpW, tmpA, 127); tmpW[127] = L'\0';
+        SetWindowTextW(hBoxMemFreq, tmpW);
+    } else {
+        SetWindowTextW(hBoxMemFreq, L"Unknown");
+    }
+
 }
 
 static void ShowBlankTab(HWND hwnd) {
     DestroyCpuControls();
     DestroyMainboardControls();
+    DestroyMemoryControls();
 }
 
 static void ShowCpuTab(HWND hwnd) {
@@ -439,12 +575,20 @@ static void ShowMainboardTab(HWND hwnd) {
 }
 
 static void SwitchTab(HWND hwnd, int sel) {
+    // Sempre destrói controles existentes antes de alternar de aba
     DestroyCpuControls();
     DestroyMainboardControls();
+    DestroyMemoryControls();
 
-    if (sel == 0)      ShowCpuTab(hwnd);
-    else if (sel == 1) ShowMainboardTab(hwnd);
-    else               ShowBlankTab(hwnd); // Memory/Graphics por enquanto vazias
+    if (sel == 0) {
+        ShowCpuTab(hwnd);
+    } else if (sel == 1) {
+        ShowMainboardTab(hwnd);
+    } else if (sel == 2) {
+        ShowMemoryTab(hwnd);
+    } else {
+        ShowBlankTab(hwnd);
+    }
     Layout(hwnd);
 }
 
