@@ -170,6 +170,36 @@ static void get_pci_vendor_name(const wchar_t* hardwareID, wchar_t* vendor, size
     }
 }
 
+// Usa a descrição do dispositivo para adivinhar o vendor
+static void guess_vendor_from_description(const wchar_t* desc,
+                                          wchar_t* vendor, size_t cchVendor)
+{
+    if (!desc || !vendor || cchVendor == 0) return;
+
+    // NVIDIA
+    if (wcsstr(desc, L"NVIDIA") != NULL || wcsstr(desc, L"nVidia") != NULL) {
+        wcsncpy(vendor, L"NVIDIA", cchVendor - 1);
+        vendor[cchVendor - 1] = L'\0';
+        return;
+    }
+
+    // Intel
+    if (wcsstr(desc, L"Intel") != NULL || wcsstr(desc, L"INTEL") != NULL) {
+        wcsncpy(vendor, L"Intel", cchVendor - 1);
+        vendor[cchVendor - 1] = L'\0';
+        return;
+    }
+
+    // AMD
+    if (wcsstr(desc, L"AMD") != NULL ||
+        wcsstr(desc, L"Advanced Micro Devices") != NULL) {
+        wcsncpy(vendor, L"AMD", cchVendor - 1);
+        vendor[cchVendor - 1] = L'\0';
+        return;
+    }
+}
+
+
 // Lê BaseBoardProduct do registry do BIOS:
 // HKEY_LOCAL_MACHINE\HARDWARE\DESCRIPTION\System\BIOS
 static BOOL get_baseboard_product(wchar_t* product, size_t cchProduct)
@@ -208,7 +238,8 @@ static BOOL extract_generic_chipset_code(const wchar_t* text, wchar_t* outCode, 
     size_t len = wcslen(text);
     for (size_t i = 0; i + 3 < len; ++i) {
         wchar_t c0 = text[i];
-        if (c0 == L'A' || c0 == L'B' || c0 == L'X') {
+        if (c0 == L'A' || c0 == L'B' || c0 == L'X' ||
+            c0 == L'H' || c0 == L'Z' || c0 == L'Q' || c0 == L'P') {
             wchar_t c1 = text[i + 1];
             wchar_t c2 = text[i + 2];
             wchar_t c3 = text[i + 3];
@@ -230,34 +261,47 @@ static BOOL extract_generic_chipset_code(const wchar_t* text, wchar_t* outCode, 
 // e SetupAPI apenas para obter a revisão do dispositivo root.
 // -----------------------------------------------------------------------------
 
+// -----------------------------------------------------------------------------
+// Detecção de CHIPSET (SoC) — usamos CPUID para vendor/model
+// e SetupAPI apenas para obter a revisão do dispositivo root.
+// -----------------------------------------------------------------------------
 static BOOL detect_chipset(ChipsetInfo* info)
 {
     if (!info) return FALSE;
 
-    // Primeiro, definimos vendor/model com base na CPU
+    // 1) Vendor e modelo básicos a partir da CPU
     wchar_t cpuVendor[64] = {0};
     get_cpu_vendor_name(cpuVendor, _countof(cpuVendor));
 
-    wchar_t model[64] = {0};
+    wchar_t model[64]    = {0};
     wchar_t revision[16] = {0};
     wcsncpy(revision, L"Rev. 00", _countof(revision) - 1);
 
     if (wcsstr(cpuVendor, L"AMD") != NULL) {
-        // Para AMD, usamos "Ryzen SOC" (ou AMD SoC) no estilo do CPU-Z
         if (!get_amd_soc_name(model, _countof(model))) {
             wcsncpy(model, L"AMD SoC", _countof(model) - 1);
         }
     } else if (wcsstr(cpuVendor, L"Intel") != NULL) {
-        // Para Intel, tentamos aproveitar a descrição do root complex
-        wcsncpy(model, L"Chipset", _countof(model) - 1);
+        // NOVO: tenta extrair um código tipo H310/B460/Z690 do BaseBoardProduct
+        wchar_t boardProduct[128] = {0};
+        if (get_baseboard_product(boardProduct, _countof(boardProduct))) {
+            wchar_t code[8] = {0};
+            if (extract_generic_chipset_code(boardProduct, code, _countof(code))) {
+                wcsncpy(model, code, _countof(model) - 1);   // ex: "H310"
+                model[_countof(model) - 1] = L'\0';
+            } else {
+                wcsncpy(model, L"Chipset", _countof(model) - 1);
+            }
+        } else {
+            wcsncpy(model, L"Chipset", _countof(model) - 1);
+        }
     } else {
         wcsncpy(model, L"Chipset", _countof(model) - 1);
     }
 
     model[_countof(model) - 1] = L'\0';
 
-    // Agora, usamos SetupAPI para procurar um dispositivo "root complex"
-    // apenas para extrair a revisão (REV_xx)
+    // 2) Usar SetupAPI apenas para achar o "root complex" e extrair a revisão (REV_xx)
     HDEVINFO deviceInfoSet = SetupDiGetClassDevsW(NULL, NULL, NULL,
                                                   DIGCF_PRESENT | DIGCF_ALLCLASSES);
     if (deviceInfoSet != INVALID_HANDLE_VALUE) {
@@ -266,7 +310,6 @@ static BOOL detect_chipset(ChipsetInfo* info)
 
         int bestScore = 0;
         wchar_t bestHardwareID[512] = {0};
-        wchar_t bestDesc[256]       = {0};
 
         for (DWORD i = 0; SetupDiEnumDeviceInfo(deviceInfoSet, i, &deviceInfoData); ++i) {
             wchar_t hardwareID[512] = {0};
@@ -307,27 +350,18 @@ static BOOL detect_chipset(ChipsetInfo* info)
                 bestScore = score;
                 wcsncpy(bestHardwareID, hardwareID, _countof(bestHardwareID) - 1);
                 bestHardwareID[_countof(bestHardwareID) - 1] = L'\0';
-
-                wcsncpy(bestDesc, deviceDesc, _countof(bestDesc) - 1);
-                bestDesc[_countof(bestDesc) - 1] = L'\0';
             }
         }
 
         SetupDiDestroyDeviceInfoList(deviceInfoSet);
 
         if (bestScore > 0) {
-            // Atualiza revisão a partir do melhor hardwareID encontrado
+            // Atualiza apenas a revisão com base no hardwareID encontrado
             extract_revision(bestHardwareID, revision, _countof(revision));
-
-            // Para Intel, se não temos nada melhor para mostrar, usamos a descrição
-            if (wcsstr(cpuVendor, L"Intel") != NULL && bestDesc[0] != L'\0') {
-                wcsncpy(model, bestDesc, _countof(model) - 1);
-                model[_countof(model) - 1] = L'\0';
-            }
         }
     }
 
-    // Preenche a struct de saída
+    // 3) Preenche a struct de saída
     wcsncpy(info->vendor, cpuVendor, _countof(info->vendor) - 1);
     info->vendor[_countof(info->vendor) - 1] = L'\0';
 
@@ -344,6 +378,9 @@ static BOOL detect_chipset(ChipsetInfo* info)
 // Detecção de SOUTHBRIDGE (PCH/FCH) via PCI + nome da placa-mãe
 // -----------------------------------------------------------------------------
 
+// -----------------------------------------------------------------------------
+// Detecção de SOUTHBRIDGE (PCH/FCH) via PCI + nome da placa-mãe
+// -----------------------------------------------------------------------------
 static BOOL detect_southbridge(ChipsetInfo* info)
 {
     if (!info) return FALSE;
@@ -361,10 +398,11 @@ static BOOL detect_southbridge(ChipsetInfo* info)
     deviceInfoData.cbSize = sizeof(SP_DEVINFO_DATA);
 
     int bestScore = 0;
-    wchar_t bestVendor[64]   = {0};
-    wchar_t bestModel[64]    = {0};
-    wchar_t bestRevision[16] = {0};
+    wchar_t bestVendor[64]      = {0};
+    wchar_t bestModel[64]       = {0};
+    wchar_t bestRevision[16]    = {0};
     wchar_t bestHardwareID[512] = {0};
+    wchar_t bestDesc[256]       = {0}; // descrição original do dispositivo
 
     for (i = 0; SetupDiEnumDeviceInfo(deviceInfoSet, i, &deviceInfoData); ++i) {
         wchar_t hardwareID[512] = {0};
@@ -415,8 +453,12 @@ static BOOL detect_southbridge(ChipsetInfo* info)
             wcsncpy(bestModel, deviceDesc, _countof(bestModel) - 1);
             bestModel[_countof(bestModel) - 1] = L'\0';
 
+            wcsncpy(bestDesc, deviceDesc, _countof(bestDesc) - 1);
+            bestDesc[_countof(bestDesc) - 1] = L'\0';
+
             extract_revision(hardwareID, bestRevision, _countof(bestRevision));
 
+            // vendor inicial via VEN_xxxx
             get_pci_vendor_name(hardwareID, bestVendor, _countof(bestVendor));
         }
     }
@@ -425,6 +467,13 @@ static BOOL detect_southbridge(ChipsetInfo* info)
 
     if (bestScore <= 0) {
         return FALSE;
+    }
+
+    // Se o vendor ficou "Unknown" ou "VEN_0000", tenta deduzir pela descrição
+    if (bestVendor[0] == L'\0' ||
+        _wcsicmp(bestVendor, L"Unknown") == 0 ||
+        wcsstr(bestVendor, L"VEN_") == bestVendor) {
+        guess_vendor_from_description(bestDesc, bestVendor, _countof(bestVendor));
     }
 
     // Tenta descobrir o "código" B550/B450/X570 etc pela placa-mãe.
