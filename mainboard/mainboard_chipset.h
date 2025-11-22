@@ -12,22 +12,24 @@ typedef struct {
     wchar_t revision[16];
 } ChipsetInfo;
 
-// Retorna informações do chipset
-// Retorna o número de entradas preenchidas (geralmente 1 para chipset)
+// Retorna informações do chipset (SoC / PCH principal).
+// max_entries é ignorado aqui (sempre 1), mas mantido por compatibilidade.
+// Retorna o número de entradas preenchidas (0 ou 1).
 size_t get_chipset_info(ChipsetInfo* info, size_t max_entries);
 
-// Retorna informações do southbridge
-// Retorna o número de entradas preenchidas (geralmente 1 para southbridge)
+// Retorna informações do southbridge (PCH/FCH).
+// Retorna o número de entradas preenchidas (0 ou 1).
 size_t get_southbridge_info(ChipsetInfo* info, size_t max_entries);
 
-// Função auxiliar para formatar as informações em formato de tabela
-// labels: array de labels (ex: "Chipset", "Southbridge")
-// vendors: array de vendors
-// models: array de models (sem revision)
-// revisions: array de revisions
-// max_rows: tamanho máximo dos arrays
-// Retorna o número de linhas preenchidas
+// Função auxiliar para montar as linhas que vão para a GUI.
+// labels:    "Chipset", "Southbridge"
+// vendors:   nome do fabricante (AMD, Intel, etc.)
+// models:    modelo (ex.: "Ryzen SOC", "B550")
+// revisions: revisão ("Rev. xx")
+// max_rows:  tamanho máximo dos arrays
+// Retorna o número de linhas preenchidas.
 size_t build_chipset_rows(wchar_t labels[][32], wchar_t vendors[][64],
-                         wchar_t models[][64], wchar_t revisions[][16], size_t max_rows);
+                          wchar_t models[][64], wchar_t revisions[][16],
+                          size_t max_rows);
 
 #endif // MAINBOARD_CHIPSET_H
