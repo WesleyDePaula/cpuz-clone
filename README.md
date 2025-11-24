@@ -8,3 +8,5 @@ Execução do programa:
 - Clone o projeto
 - Execute o script ./compile.sh que está na pasta raiz do projeto
 - Irá criar um arquivo executável (.exe) do programa na raiz do projeto
+
+Alunos: Wesley Zeitz de Paula, Beatriz Maryah do Carmo, Lucas Edgar Cardoso
