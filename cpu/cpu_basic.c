@@ -3,6 +3,7 @@
 #include <intrin.h>
 #include "cpu_basic.h"
 
+// Obtém o fabricante do processador via instrução CPUID
 void get_cpu_vendor(char vendor[13]) {
     int r[4] = {0};
     vendor[0] = '\0';
@@ -13,6 +14,7 @@ void get_cpu_vendor(char vendor[13]) {
     vendor[12] = '\0';
 }
 
+// Obtém o nome comercial do processador via CPUID (ex: Intel Core i7-9700K)
 void get_cpu_brand(char brand[49]) {
     int r[4]; brand[0] = '\0';
     __cpuid(r, 0x80000000);

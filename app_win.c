@@ -485,14 +485,18 @@ static void ShowGraphicsTab(HWND hwnd) {
     if (get_gpu_tdp(tmpA, sizeof(tmpA))) {
         wchar_t tmpW[64]; mbstowcs(tmpW, tmpA, 63); tmpW[63] = L'\0';
         SetWindowTextW(hBoxGpuTdp, tmpW);
+        EnableWindow(hBoxGpuTdp, TRUE);
     } else {
-        SetWindowTextW(hBoxGpuTdp, L"Unknown");
+        SetWindowTextW(hBoxGpuTdp, L"N/A");
+        EnableWindow(hBoxGpuTdp, FALSE);
     }
     if (get_gpu_base_clock(tmpA, sizeof(tmpA))) {
         wchar_t tmpW[64]; mbstowcs(tmpW, tmpA, 63); tmpW[63] = L'\0';
         SetWindowTextW(hBoxGpuClock, tmpW);
+        EnableWindow(hBoxGpuClock, TRUE);
     } else {
-        SetWindowTextW(hBoxGpuClock, L"Unknown");
+        SetWindowTextW(hBoxGpuClock, L"N/A");
+        EnableWindow(hBoxGpuClock, FALSE);
     }
 
     // Fill VRAM fields
@@ -505,20 +509,26 @@ static void ShowGraphicsTab(HWND hwnd) {
     if (get_vram_type(tmpA, sizeof(tmpA))) {
         wchar_t tmpW[64]; mbstowcs(tmpW, tmpA, 63); tmpW[63] = L'\0';
         SetWindowTextW(hBoxVramType, tmpW);
+        EnableWindow(hBoxVramType, TRUE);
     } else {
-        SetWindowTextW(hBoxVramType, L"Unknown");
+        SetWindowTextW(hBoxVramType, L"N/A");
+        EnableWindow(hBoxVramType, FALSE);
     }
     if (get_vram_vendor(tmpA, sizeof(tmpA))) {
         wchar_t tmpW[64]; mbstowcs(tmpW, tmpA, 63); tmpW[63] = L'\0';
         SetWindowTextW(hBoxVramVendor, tmpW);
+        EnableWindow(hBoxVramVendor, TRUE);
     } else {
-        SetWindowTextW(hBoxVramVendor, L"Unknown");
+        SetWindowTextW(hBoxVramVendor, L"N/A");
+        EnableWindow(hBoxVramVendor, FALSE);
     }
     if (get_vram_bus_width(tmpA, sizeof(tmpA))) {
         wchar_t tmpW[64]; mbstowcs(tmpW, tmpA, 63); tmpW[63] = L'\0';
         SetWindowTextW(hBoxVramBusWidth, tmpW);
+        EnableWindow(hBoxVramBusWidth, TRUE);
     } else {
-        SetWindowTextW(hBoxVramBusWidth, L"Unknown");
+        SetWindowTextW(hBoxVramBusWidth, L"N/A");
+        EnableWindow(hBoxVramBusWidth, FALSE);
     }
 
     // Final layout update to position the filled controls

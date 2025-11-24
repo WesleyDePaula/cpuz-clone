@@ -1,4 +1,5 @@
-// mainboard_basic.c - Implementação das funções de informações básicas da motherboard
+// mainboard_basic.c - Informações básicas da placa-mãe
+// Obtém fabricante e modelo via WMI
 #define _CRT_SECURE_NO_WARNINGS
 #include "mainboard_basic.h"
 #include <stdio.h>
@@ -10,7 +11,7 @@
 #pragma comment(lib, "ole32.lib")
 #pragma comment(lib, "oleaut32.lib")
 
-// Função auxiliar para executar queries WMI
+// Executa uma consulta WMI e extrai o valor de texto
 static BOOL execute_wmi_query(const wchar_t* query, const wchar_t* property, char* buffer, size_t bufsize) {
     HRESULT hr;
     IWbemLocator* pLoc = NULL;
@@ -20,13 +21,13 @@ static BOOL execute_wmi_query(const wchar_t* query, const wchar_t* property, cha
     ULONG uReturn = 0;
     BOOL result = FALSE;
 
-    // Inicializar COM
+    // Inicializa o sistema COM
     hr = CoInitializeEx(0, COINIT_MULTITHREADED);
     if (FAILED(hr) && hr != RPC_E_CHANGED_MODE) {
         return FALSE;
     }
 
-    // Configurar segurança COM
+    // Configura segurança do COM
     hr = CoInitializeSecurity(
         NULL, -1, NULL, NULL,
         RPC_C_AUTHN_LEVEL_DEFAULT,
@@ -39,7 +40,7 @@ static BOOL execute_wmi_query(const wchar_t* query, const wchar_t* property, cha
         return FALSE;
     }
 
-    // Obter locator WMI
+    // Obtém o localizador do WMI
     hr = CoCreateInstance(
         &CLSID_WbemLocator, 0,
         CLSCTX_INPROC_SERVER,
@@ -62,7 +63,7 @@ static BOOL execute_wmi_query(const wchar_t* query, const wchar_t* property, cha
         return FALSE;
     }
 
-    // Configurar proxy de segurança
+    // Define segurança da conexão
     hr = CoSetProxyBlanket(
         (IUnknown*)pSvc,
         RPC_C_AUTHN_WINNT,
@@ -80,7 +81,7 @@ static BOOL execute_wmi_query(const wchar_t* query, const wchar_t* property, cha
         return FALSE;
     }
 
-    // Executar query WMI
+    // Executa a consulta WMI
     hr = pSvc->lpVtbl->ExecQuery(pSvc,
         L"WQL",
         (BSTR)query,
@@ -95,7 +96,7 @@ static BOOL execute_wmi_query(const wchar_t* query, const wchar_t* property, cha
         return FALSE;
     }
 
-    // Obter resultado
+    // Pega o primeiro resultado
     hr = pEnumerator->lpVtbl->Next(pEnumerator, WBEM_INFINITE, 1, &pclsObj, &uReturn);
 
     if (uReturn > 0) {
@@ -104,7 +105,7 @@ static BOOL execute_wmi_query(const wchar_t* query, const wchar_t* property, cha
 
         hr = pclsObj->lpVtbl->Get(pclsObj, property, 0, &vtProp, 0, 0);
         if (SUCCEEDED(hr) && vtProp.vt == VT_BSTR && vtProp.bstrVal != NULL) {
-            // Converter BSTR para char*
+            // Converte o texto para formato char*
             int len = WideCharToMultiByte(CP_UTF8, 0, vtProp.bstrVal, -1, NULL, 0, NULL, NULL);
             if (len > 0 && (size_t)len <= bufsize) {
                 WideCharToMultiByte(CP_UTF8, 0, vtProp.bstrVal, -1, buffer, (int)bufsize, NULL, NULL);
@@ -156,7 +157,7 @@ BOOL get_motherboard_bus_specs(char* buffer, size_t bufsize) {
     if (!buffer || bufsize < 1) return FALSE;
     buffer[0] = '\0';
 
-    // Tentar obter informações de PCI Express através do registro do Windows
+    // Try to get PCI Express info from Windows registry
     HKEY hKey;
     LONG result = RegOpenKeyExA(HKEY_LOCAL_MACHINE,
         "SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e97d-e325-11ce-bfc1-08002be10318}",

@@ -1,4 +1,5 @@
-// mainboard_bios.c - Implementação das funções de informações da BIOS
+// mainboard_bios.c - Informações da BIOS/UEFI
+// Obtém fabricante, versão e data da BIOS via WMI
 #define _CRT_SECURE_NO_WARNINGS
 #include "mainboard_bios.h"
 #include <stdio.h>
@@ -10,7 +11,7 @@
 #pragma comment(lib, "ole32.lib")
 #pragma comment(lib, "oleaut32.lib")
 
-// Função auxiliar para executar queries WMI
+// Executa uma consulta WMI e extrai o valor de texto
 static BOOL execute_wmi_query(const wchar_t* query, const wchar_t* property, char* buffer, size_t bufsize) {
     HRESULT hr;
     IWbemLocator* pLoc = NULL;
@@ -20,13 +21,13 @@ static BOOL execute_wmi_query(const wchar_t* query, const wchar_t* property, cha
     ULONG uReturn = 0;
     BOOL result = FALSE;
 
-    // Inicializar COM
+    // Inicializa o sistema COM
     hr = CoInitializeEx(0, COINIT_MULTITHREADED);
     if (FAILED(hr) && hr != RPC_E_CHANGED_MODE) {
         return FALSE;
     }
 
-    // Configurar segurança COM
+    // Configura segurança do COM
     hr = CoInitializeSecurity(
         NULL, -1, NULL, NULL,
         RPC_C_AUTHN_LEVEL_DEFAULT,
@@ -39,7 +40,7 @@ static BOOL execute_wmi_query(const wchar_t* query, const wchar_t* property, cha
         return FALSE;
     }
 
-    // Obter locator WMI
+    // Obtém o localizador do WMI
     hr = CoCreateInstance(
         &CLSID_WbemLocator, 0,
         CLSCTX_INPROC_SERVER,
@@ -62,7 +63,7 @@ static BOOL execute_wmi_query(const wchar_t* query, const wchar_t* property, cha
         return FALSE;
     }
 
-    // Configurar proxy de segurança
+    // Define segurança da conexão
     hr = CoSetProxyBlanket(
         (IUnknown*)pSvc,
         RPC_C_AUTHN_WINNT,
@@ -80,7 +81,7 @@ static BOOL execute_wmi_query(const wchar_t* query, const wchar_t* property, cha
         return FALSE;
     }
 
-    // Executar query WMI
+    // Executa a consulta WMI
     hr = pSvc->lpVtbl->ExecQuery(pSvc,
         L"WQL",
         (BSTR)query,

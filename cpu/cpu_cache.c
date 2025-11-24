@@ -1,4 +1,5 @@
-// cpu_cache.c
+// cpu_cache.c - Informações de cache do processador
+// Obtém dados de cache L1/L2/L3 via API do Windows
 #define _CRT_SECURE_NO_WARNINGS
 #include <windows.h>
 #include <stdio.h>
@@ -12,6 +13,7 @@ typedef struct {
     DWORD count;
 } CacheAgg;
 
+// Retorna o rótulo amigável para cada tipo de cache
 static const char* cache_label(UINT8 level, PROCESSOR_CACHE_TYPE type) {
     if (level == 1 && type == CacheData)        return "L1 Data";
     if (level == 1 && type == CacheInstruction) return "L1 Inst.";
@@ -21,6 +23,7 @@ static const char* cache_label(UINT8 level, PROCESSOR_CACHE_TYPE type) {
     return "Level ?";
 }
 
+// Converte bytes para formato legível (KBytes ou MBytes)
 static void human_kbytes_str(DWORD bytes, char out[32]) {
     double kb = bytes / 1024.0;
     if (kb >= 1024.0) {

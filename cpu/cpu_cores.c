@@ -1,8 +1,10 @@
-// cpu_cores.c
+// cpu_cores.c - Contagem de núcleos físicos e lógicos
+// Usa a API do Windows para contar cores reais e threads
 #include <windows.h>
 #include <stdlib.h>
 #include "cpu_cores.h"
 
+// Conta quantos núcleos físicos existem no processador
 DWORD count_physical_cores(void) {
     DWORD len = 0;
     GetLogicalProcessorInformationEx(RelationProcessorCore, NULL, &len);
@@ -36,6 +38,7 @@ DWORD count_physical_cores(void) {
     free(buf); return cores;
 }
 
+// Conta quantos processadores lógicos existem (inclui hyper-threading)
 DWORD count_logical_processors(void) {
     WORD groups = GetActiveProcessorGroupCount();
     DWORD total = 0;

@@ -1,12 +1,6 @@
-// memory_timings.c - implementações para parâmetros de temporização da memória
-//
-// Nas plataformas Windows, não existe uma API pública para ler os
-// registros SPD de módulos de memória, de onde se obtêm as
-// temporizações (CL, tRCD, tRAS, tRC, CR). Em geral, isso requer
-// um driver de nível kernel ou acesso direto ao controlador de
-// memória. Este módulo tenta obter a frequência efetiva da DRAM
-// usando a classe WMI Win32_PhysicalMemory. Os demais valores são
-// retornados como desconhecidos.
+// memory_timings.c - memory timing parameters
+// Windows has no public API for SPD registers. Only DRAM frequency is available via WMI.
+// Timings (CL, tRCD, tRAS, etc.) require kernel driver or direct memory controller access.
 
 #include "memory_timings.h"
 
@@ -16,13 +10,10 @@
 #include <stdio.h>
 #include <stdint.h>
 
-// Reutiliza a função de inicialização do WMI definida no módulo
-// memory_general. Para evitar dependência circular, declaramos um
-// protótipo aqui. Essa função inicializa COM e obtém um ponteiro
-// para IWbemServices.
+// Local copy of init_wmi to avoid circular dependency with memory_general.c
 static bool init_wmi(IWbemServices **pSvcOut);
 
-// Implementação local de init_wmi replicada de memory_general.c.
+// Initialize COM and connect to WMI ROOT\CIMV2 namespace
 static bool init_wmi(IWbemServices **pSvcOut) {
     if (!pSvcOut) return false;
     *pSvcOut = NULL;
@@ -66,6 +57,8 @@ static bool init_wmi(IWbemServices **pSvcOut) {
     return true;
 }
 
+// DRAM Frequency: WMI Win32_PhysicalMemory ConfiguredClockSpeed or Speed / 2
+// Speed property reports transfer rate (MT/s); divide by 2 for actual clock (MHz)
 bool get_dram_frequency(char *buf, size_t buf_size) {
     if (!buf || buf_size == 0) return false;
     IWbemServices *pSvc = NULL;
@@ -73,9 +66,6 @@ bool get_dram_frequency(char *buf, size_t buf_size) {
         return false;
     }
     IEnumWbemClassObject *pEnum = NULL;
-    // Tenta obter Speed ou ConfiguredClockSpeed. O valor de Speed
-    // corresponde à taxa de transferência (MT/s); metade disso é
-    // a frequência real (MHz) da DRAM.
     HRESULT hr = IWbemServices_ExecQuery(pSvc, L"WQL",
         L"SELECT ConfiguredClockSpeed, Speed FROM Win32_PhysicalMemory", WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY,
         NULL, &pEnum);

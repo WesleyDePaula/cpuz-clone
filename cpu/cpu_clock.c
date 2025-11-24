@@ -1,6 +1,8 @@
+// cpu_clock.c - Frequências do processador
+// Obtém as velocidades atual, máxima e limite via API de energia do Windows
 #define _CRT_SECURE_NO_WARNINGS
 #include <windows.h>
-#include <powrprof.h>   // CallNtPowerInformation
+#include <powrprof.h>
 #include <stdbool.h>
 #include <stdlib.h>
 
@@ -17,13 +19,14 @@ typedef struct _PROCESSOR_POWER_INFORMATION {
     ULONG CurrentIdleState;
 } PROCESSOR_POWER_INFORMATION, *PPROCESSOR_POWER_INFORMATION;
 
+// Obtém as frequências do primeiro núcleo lógico
 bool get_cpu0_clock(DWORD *current_mhz, DWORD *max_mhz, DWORD *limit_mhz) {
     if (!current_mhz || !max_mhz || !limit_mhz) return false;
 
-    // Nº total de processadores lógicos (considerando processor groups)
+    // Descobre quantos processadores lógicos existem
     DWORD nprocs = GetActiveProcessorCount(ALL_PROCESSOR_GROUPS);
     if (nprocs == 0) {
-        // Fallback raro
+        // Se falhar, tenta método alternativo
         SYSTEM_INFO si; GetSystemInfo(&si);
         nprocs = si.dwNumberOfProcessors;
         if (nprocs == 0) return false;
@@ -38,12 +41,12 @@ bool get_cpu0_clock(DWORD *current_mhz, DWORD *max_mhz, DWORD *limit_mhz) {
         ppi, sizeof(*ppi) * nprocs
     );
 
-    if (st != 0) {  // STATUS_SUCCESS == 0
+    if (st != 0) {
         free(ppi);
         return false;
     }
 
-    // Núcleo lógico 0
+    // Pega os valores do primeiro núcleo
     *current_mhz = ppi[0].CurrentMhz;
     *max_mhz     = ppi[0].MaxMhz;
     *limit_mhz   = ppi[0].MhzLimit;

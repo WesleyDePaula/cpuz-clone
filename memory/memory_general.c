@@ -1,10 +1,5 @@
-// memory_general.c - implementações para informação geral de memória
-//
-// Este módulo utiliza a API do Windows e consultas WMI para
-// recuperar dados básicos sobre os módulos de memória instalados.
-// As funções aqui expostas retornam cadeias de caracteres em ANSI
-// contendo o valor solicitado. Quando uma consulta falha, as
-// funções retornam false e não modificam o buffer.
+// memory_general.c - Informações gerais sobre a memória RAM
+// Usa WMI e API do Windows para obter tipo, tamanho e frequência da memória
 
 #include "memory_general.h"
 
@@ -15,30 +10,26 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-// Linkar contra wbemuuid.lib é necessário para usar WMI. O link
-// está incluído no script de compilação.
 #pragma comment(lib, "wbemuuid.lib")
 
-// Função auxiliar para inicializar COM e conectar-se ao serviço WMI.
-// Em caso de sucesso, pSvc aponta para um IWbemServices válido. Em
-// caso de falha, retorna false.
+// Conecta ao WMI do Windows para consultar informações de hardware
 static bool init_wmi(IWbemServices **pSvcOut) {
     if (!pSvcOut) return false;
     *pSvcOut = NULL;
     HRESULT hr;
 
-    // Inicializa COM se ainda não estiver inicializado para este thread.
+    // Inicializa o sistema COM
     hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
     if (FAILED(hr) && hr != RPC_E_CHANGED_MODE) {
         return false;
     }
 
-    // Define níveis de segurança para chamadas WMI.
+    // Configura níveis de segurança
     hr = CoInitializeSecurity(NULL, -1, NULL, NULL,
                               RPC_C_AUTHN_LEVEL_DEFAULT,
                               RPC_C_IMP_LEVEL_IMPERSONATE,
                               NULL, EOAC_NONE, NULL);
-    // RPC_E_TOO_LATE indica que a segurança já foi inicializada anteriormente.
+    // Se já estiver inicializado, continua normalmente
     if (FAILED(hr) && hr != RPC_E_TOO_LATE) {
         CoUninitialize();
         return false;
@@ -52,7 +43,7 @@ static bool init_wmi(IWbemServices **pSvcOut) {
         return false;
     }
 
-    // Conecta ao namespace ROOT\CIMV2.
+    // Conecta ao namespace do WMI onde ficam as informações de hardware
     IWbemServices *pSvc = NULL;
     hr = IWbemLocator_ConnectServer(pLoc, L"ROOT\\CIMV2", NULL, NULL, 0, 0, NULL, NULL, &pSvc);
     IWbemLocator_Release(pLoc);
@@ -61,7 +52,7 @@ static bool init_wmi(IWbemServices **pSvcOut) {
         return false;
     }
 
-    // Define o nível de proxy.
+    // Configura segurança da conexão
     hr = CoSetProxyBlanket((IUnknown*)pSvc,
                            RPC_C_AUTHN_WINNT, RPC_C_AUTHZ_NONE, NULL,
                            RPC_C_AUTHN_LEVEL_CALL, RPC_C_IMP_LEVEL_IMPERSONATE,
@@ -76,18 +67,18 @@ static bool init_wmi(IWbemServices **pSvcOut) {
     return true;
 }
 
-// Interpreta o código SMBIOS de tipo de memória em uma string legível.
+// Converte o código numérico da SMBIOS para o nome do tipo de memória
 static const char *mem_type_from_code(int code) {
     switch (code) {
         case 0x13: return "SDRAM";      // 19
         case 0x14: return "DDR";        // 20
         case 0x15: return "DDR2";       // 21
-        case 0x17: return "DDR3";       // 23? mas 0x18 no SMBIOS? utilizar casos comuns
+        case 0x17: return "DDR3";       // 23
         case 0x18: return "DDR3";       // 24
         case 0x1A: return "DDR4";       // 26
         case 0x1E: return "DDR5";       // 30
         default:
-            // Mapear alguns valores conhecidos conforme a especificação SMBIOS.
+            // Verifica códigos em formato decimal também
             if (code == 19) return "SDRAM";
             if (code == 20) return "DDR";
             if (code == 21) return "DDR2";
@@ -97,11 +88,14 @@ static const char *mem_type_from_code(int code) {
             if (code == 27) return "LPDDR";
             if (code == 28) return "LPDDR2";
             if (code == 29) return "LPDDR3";
-            if (code == 30) return "DDR4"; // algumas implementações retornam 30 para DDR4/5
+            if (code == 30) return "DDR4";
+            if (code == 34) return "DDR5";
+            if (code == 35) return "LPDDR5";
             return "Unknown";
     }
 }
 
+// Obtém o tipo de memória (DDR3, DDR4, DDR5, etc) via WMI
 bool get_memory_type(char *buf, size_t buf_size) {
     if (!buf || buf_size == 0) return false;
     IWbemServices *pSvc = NULL;
@@ -122,7 +116,7 @@ bool get_memory_type(char *buf, size_t buf_size) {
     int typeCode = 0;
     ULONG uReturn = 0;
     IWbemClassObject *pObj = NULL;
-    // Itera sobre as instâncias; considera a primeira com valor definido.
+    // Percorre os módulos de memória e pega o primeiro válido
     while (S_OK == IEnumWbemClassObject_Next(pEnum, WBEM_INFINITE, 1, &pObj, &uReturn)) {
         VARIANT vtProp;
         VariantInit(&vtProp);
@@ -148,6 +142,7 @@ bool get_memory_type(char *buf, size_t buf_size) {
     return true;
 }
 
+// Obtém a quantidade total de memória RAM instalada
 bool get_memory_size(char *buf, size_t buf_size) {
     if (!buf || buf_size == 0) return false;
     ULONGLONG memKB = 0;
@@ -155,14 +150,15 @@ bool get_memory_size(char *buf, size_t buf_size) {
     if (!ok || memKB == 0) {
         return false;
     }
-    // Converte kbytes para GiB (1 GiB = 1024*1024 KiB)
+    // Convert KB to GiB (1 GiB = 1024*1024 KB)
     double gib = (double)memKB / (1024.0 * 1024.0);
-    // Arredonda para o inteiro mais próximo
+    // Round to nearest integer
     unsigned int gigs = (unsigned int)(gib + 0.5);
     snprintf(buf, buf_size, "%u GBytes", gigs);
     return true;
 }
 
+// Memory Channel Configuration: WMI Win32_PhysicalMemory.DataWidth count
 bool get_memory_channels(char *buf, size_t buf_size) {
     if (!buf || buf_size == 0) return false;
     IWbemServices *pSvc = NULL;

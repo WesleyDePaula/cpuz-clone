@@ -1,33 +1,30 @@
-// mainboard_chipset.h - Funções para obter informações de chipset e southbridge
+// mainboard_chipset.h - Informações de chipset e southbridge
+// Usa CPUID, registro do Windows e enumeração de dispositivos PCI
 #ifndef MAINBOARD_CHIPSET_H
 #define MAINBOARD_CHIPSET_H
 
 #include <windows.h>
 #include <wchar.h>
 
-// Estrutura para armazenar informações de chipset/southbridge
+// Estrutura com informações de chipset/southbridge
 typedef struct {
-    wchar_t vendor[64];
-    wchar_t model[64];
-    wchar_t revision[16];
+    wchar_t vendor[64];    // Fabricante (AMD, Intel, etc)
+    wchar_t model[64];     // Modelo (Ryzen SOC, B550, Comet Lake, etc)
+    wchar_t revision[16];  // Revisão do hardware
 } ChipsetInfo;
 
-// Retorna informações do chipset (SoC / PCH principal).
-// max_entries é ignorado aqui (sempre 1), mas mantido por compatibilidade.
-// Retorna o número de entradas preenchidas (0 ou 1).
+// Get chipset info (SoC / primary PCH)
+// Source: CPUID vendor + WMI Win32_BaseBoard.Product pattern matching
+// Returns: number of entries filled (0 or 1)
 size_t get_chipset_info(ChipsetInfo* info, size_t max_entries);
 
-// Retorna informações do southbridge (PCH/FCH).
-// Retorna o número de entradas preenchidas (0 ou 1).
+// Get southbridge info (PCH/FCH)
+// Source: PCI device enumeration for ISA/LPC bridges, vendor ID mapping
+// Returns: number of entries filled (0 or 1)
 size_t get_southbridge_info(ChipsetInfo* info, size_t max_entries);
 
-// Função auxiliar para montar as linhas que vão para a GUI.
-// labels:    "Chipset", "Southbridge"
-// vendors:   nome do fabricante (AMD, Intel, etc.)
-// models:    modelo (ex.: "Ryzen SOC", "B550")
-// revisions: revisão ("Rev. xx")
-// max_rows:  tamanho máximo dos arrays
-// Retorna o número de linhas preenchidas.
+// Build display rows for GUI from chipset/southbridge data
+// Returns: number of rows filled
 size_t build_chipset_rows(wchar_t labels[][32], wchar_t vendors[][64],
                           wchar_t models[][64], wchar_t revisions[][16],
                           size_t max_rows);
