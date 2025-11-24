@@ -14,6 +14,7 @@
 #include "mainboard/mainboard_bios.h"
 #include "memory/memory_general.h"
 #include "memory/memory_timings.h"
+#include "graphics/graphics.h"
 
 #pragma comment(lib, "comctl32.lib")
 
@@ -67,6 +68,21 @@ enum {
     // Timing fields
     IDC_LBL_DRAM_FREQ = 730, IDC_BOX_DRAM_FREQ,
 
+    // Graphics tab groups
+    IDC_GRP_GPU = 800, IDC_GRP_VRAM,
+
+    // GPU fields
+    IDC_LBL_GPU_NAME,  IDC_BOX_GPU_NAME,
+    IDC_LBL_GPU_BOARD, IDC_BOX_GPU_BOARD,
+    IDC_LBL_GPU_TDP,   IDC_BOX_GPU_TDP,
+    IDC_LBL_GPU_CLOCK, IDC_BOX_GPU_CLOCK,
+
+    // VRAM fields
+    IDC_LBL_VRAM_SIZE,      IDC_BOX_VRAM_SIZE,
+    IDC_LBL_VRAM_TYPE,      IDC_BOX_VRAM_TYPE,
+    IDC_LBL_VRAM_VENDOR,    IDC_BOX_VRAM_VENDOR,
+    IDC_LBL_VRAM_BUS_WIDTH, IDC_BOX_VRAM_BUS_WIDTH,
+
 };
 
 static const wchar_t* APP_TITLE = L"Ultra Mega Blaster Alpha Hardware Info: Ultimate 2025 Edition XYZ";
@@ -92,6 +108,19 @@ static HWND hLblBiosBrand, hBoxBiosBrand, hLblBiosVer, hBoxBiosVer, hLblBiosDate
     static HWND hLblMemSize, hBoxMemSize;
     static HWND hLblMemChannel, hBoxMemChannel;
     static HWND hLblMemFreq, hBoxMemFreq;
+
+// Graphics tab
+static HWND hGroupGpu, hGroupVram;
+// GPU fields
+static HWND hLblGpuName,  hBoxGpuName;
+static HWND hLblGpuBoard, hBoxGpuBoard;
+static HWND hLblGpuTdp,   hBoxGpuTdp;
+static HWND hLblGpuClock, hBoxGpuClock;
+// VRAM fields
+static HWND hLblVramSize,    hBoxVramSize;
+static HWND hLblVramType,    hBoxVramType;
+static HWND hLblVramVendor,  hBoxVramVendor;
+static HWND hLblVramBusWidth, hBoxVramBusWidth;
 
 static void CreateTabs(HWND hwnd) {
     hTab = CreateWindowExW(0, WC_TABCONTROLW, L"", WS_CHILD|WS_CLIPSIBLINGS|WS_VISIBLE,
@@ -196,7 +225,7 @@ static void Layout(HWND hwnd) {
             MoveWindow(hBoxCacheAssoc[i], leftX + lblW + 6 + sizeBoxW + 10, cacheBaseY + i*rowH, assocBoxW, boxH, TRUE);
     }
 
-    // Se a aba de memória estiver ativa (grupos de memória criados), posiciona controles
+    // Se a aba de memória estiver ativa (grupo de memória criado), posiciona controles
     if (hGroupMemGeneral) {
         // Usa um único grupo ocupando toda a área disponível
         int memGrpH = areaH;
@@ -236,6 +265,58 @@ static void Layout(HWND hwnd) {
         // Não há painel separado de Timings — referências removidas
 
     }
+
+    // Se a aba de gráficos estiver ativa (grupos de gráficos criados), posiciona controles
+    if (hGroupGpu) {
+        // Duas zonas verticais: GPU e VRAM
+        int padX = 12, padY = 22, rowH = 24;
+        int lblW = 130, boxW = 320, boxH = 20;
+        int grpH = (areaH - margin) / 2;
+        // Group boxes
+        if (hGroupGpu)
+            MoveWindow(hGroupGpu, areaX, areaY, areaW, grpH, TRUE);
+        if (hGroupVram)
+            MoveWindow(hGroupVram, areaX, areaY + grpH + margin, areaW, grpH, TRUE);
+
+        int leftX = areaX + padX;
+        // GPU group fields
+        int gpuBaseY = areaY + padY;
+        if (hLblGpuName)
+            MoveWindow(hLblGpuName,  leftX, gpuBaseY + 0*rowH, lblW, boxH, TRUE);
+        if (hBoxGpuName)
+            MoveWindow(hBoxGpuName,  leftX + lblW + 6, gpuBaseY + 0*rowH, boxW, boxH, TRUE);
+        if (hLblGpuBoard)
+            MoveWindow(hLblGpuBoard, leftX, gpuBaseY + 1*rowH, lblW, boxH, TRUE);
+        if (hBoxGpuBoard)
+            MoveWindow(hBoxGpuBoard, leftX + lblW + 6, gpuBaseY + 1*rowH, boxW, boxH, TRUE);
+        if (hLblGpuTdp)
+            MoveWindow(hLblGpuTdp,   leftX, gpuBaseY + 2*rowH, lblW, boxH, TRUE);
+        if (hBoxGpuTdp)
+            MoveWindow(hBoxGpuTdp,   leftX + lblW + 6, gpuBaseY + 2*rowH, boxW, boxH, TRUE);
+        if (hLblGpuClock)
+            MoveWindow(hLblGpuClock, leftX, gpuBaseY + 3*rowH, lblW, boxH, TRUE);
+        if (hBoxGpuClock)
+            MoveWindow(hBoxGpuClock, leftX + lblW + 6, gpuBaseY + 3*rowH, boxW, boxH, TRUE);
+
+        // VRAM group fields
+        int vramBaseY = areaY + grpH + margin + padY;
+        if (hLblVramSize)
+            MoveWindow(hLblVramSize,     leftX, vramBaseY + 0*rowH, lblW, boxH, TRUE);
+        if (hBoxVramSize)
+            MoveWindow(hBoxVramSize,     leftX + lblW + 6, vramBaseY + 0*rowH, boxW, boxH, TRUE);
+        if (hLblVramType)
+            MoveWindow(hLblVramType,     leftX, vramBaseY + 1*rowH, lblW, boxH, TRUE);
+        if (hBoxVramType)
+            MoveWindow(hBoxVramType,     leftX + lblW + 6, vramBaseY + 1*rowH, boxW, boxH, TRUE);
+        if (hLblVramVendor)
+            MoveWindow(hLblVramVendor,   leftX, vramBaseY + 2*rowH, lblW, boxH, TRUE);
+        if (hBoxVramVendor)
+            MoveWindow(hBoxVramVendor,   leftX + lblW + 6, vramBaseY + 2*rowH, boxW, boxH, TRUE);
+        if (hLblVramBusWidth)
+            MoveWindow(hLblVramBusWidth, leftX, vramBaseY + 3*rowH, lblW, boxH, TRUE);
+        if (hBoxVramBusWidth)
+            MoveWindow(hBoxVramBusWidth, leftX + lblW + 6, vramBaseY + 3*rowH, boxW, boxH, TRUE);
+    }
 }
 
 // Libera e remove todos os controles da aba de memória.
@@ -249,6 +330,25 @@ static void DestroyMemoryControls(void) {
     }
     hGroupMemGeneral = NULL;
     hLblMemType=hBoxMemType=hLblMemSize=hBoxMemSize=hLblMemChannel=hBoxMemChannel=hLblMemFreq=hBoxMemFreq=NULL;
+}
+
+// Release and remove all controls of the graphics tab.
+static void DestroyGraphicsControls(void) {
+    HWND arr[] = {
+        hLblGpuName, hBoxGpuName, hLblGpuBoard, hBoxGpuBoard,
+        hLblGpuTdp, hBoxGpuTdp, hLblGpuClock, hBoxGpuClock,
+        hLblVramSize, hBoxVramSize, hLblVramType, hBoxVramType,
+        hLblVramVendor, hBoxVramVendor, hLblVramBusWidth, hBoxVramBusWidth,
+        hGroupGpu, hGroupVram
+    };
+    for (int i=0; i<(int)(sizeof(arr)/sizeof(arr[0])); ++i) {
+        if (arr[i]) DestroyWindow(arr[i]);
+    }
+    hGroupGpu = hGroupVram = NULL;
+    hLblGpuName = hBoxGpuName = hLblGpuBoard = hBoxGpuBoard = NULL;
+    hLblGpuTdp  = hBoxGpuTdp  = hLblGpuClock = hBoxGpuClock = NULL;
+    hLblVramSize = hBoxVramSize = hLblVramType = hBoxVramType = NULL;
+    hLblVramVendor = hBoxVramVendor = hLblVramBusWidth = hBoxVramBusWidth = NULL;
 }
 
 // Cria os controles da aba de memória e preenche os valores consultando o sistema.
@@ -310,10 +410,126 @@ static void ShowMemoryTab(HWND hwnd) {
 
 }
 
+// Creates the controls for the graphics tab and populates them with
+// information retrieved from the system.  The tab contains two groups:
+// one for the GPU itself (name, board manufacturer, TDP, base clock) and
+// another for the video memory (size, type, vendor, bus width).  Unknown
+// values are displayed as "Unknown".  All controls are created as
+// children of the main window (not the group boxes) to simplify layout.
+static void ShowGraphicsTab(HWND hwnd) {
+    // Destroy other tabs to avoid overlap
+    DestroyCpuControls();
+    DestroyMainboardControls();
+    DestroyMemoryControls();
+    DestroyGraphicsControls();
+
+    // Create group boxes
+    hGroupGpu  = CreateWindowExW(0, L"BUTTON", L"GPU", WS_CHILD|WS_VISIBLE|BS_GROUPBOX,
+                                 0,0,0,0, hwnd, (HMENU)IDC_GRP_GPU, GetModuleHandle(NULL), NULL);
+    hGroupVram = CreateWindowExW(0, L"BUTTON", L"Memory", WS_CHILD|WS_VISIBLE|BS_GROUPBOX,
+                                 0,0,0,0, hwnd, (HMENU)IDC_GRP_VRAM, GetModuleHandle(NULL), NULL);
+
+    // GPU fields
+    hLblGpuName  = CreateWindowExW(0, L"STATIC", L"Name", WS_CHILD|WS_VISIBLE|SS_LEFT,
+                                   0,0,0,0, hwnd, (HMENU)IDC_LBL_GPU_NAME, GetModuleHandle(NULL), NULL);
+    hBoxGpuName  = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD|WS_VISIBLE|ES_READONLY,
+                                   0,0,0,0, hwnd, (HMENU)IDC_BOX_GPU_NAME, GetModuleHandle(NULL), NULL);
+    hLblGpuBoard = CreateWindowExW(0, L"STATIC", L"Board Manuf.", WS_CHILD|WS_VISIBLE|SS_LEFT,
+                                   0,0,0,0, hwnd, (HMENU)IDC_LBL_GPU_BOARD, GetModuleHandle(NULL), NULL);
+    hBoxGpuBoard = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD|WS_VISIBLE|ES_READONLY,
+                                   0,0,0,0, hwnd, (HMENU)IDC_BOX_GPU_BOARD, GetModuleHandle(NULL), NULL);
+    hLblGpuTdp   = CreateWindowExW(0, L"STATIC", L"TDP", WS_CHILD|WS_VISIBLE|SS_LEFT,
+                                   0,0,0,0, hwnd, (HMENU)IDC_LBL_GPU_TDP, GetModuleHandle(NULL), NULL);
+    hBoxGpuTdp   = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD|WS_VISIBLE|ES_READONLY,
+                                   0,0,0,0, hwnd, (HMENU)IDC_BOX_GPU_TDP, GetModuleHandle(NULL), NULL);
+    hLblGpuClock = CreateWindowExW(0, L"STATIC", L"Clock", WS_CHILD|WS_VISIBLE|SS_LEFT,
+                                   0,0,0,0, hwnd, (HMENU)IDC_LBL_GPU_CLOCK, GetModuleHandle(NULL), NULL);
+    hBoxGpuClock = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD|WS_VISIBLE|ES_READONLY,
+                                   0,0,0,0, hwnd, (HMENU)IDC_BOX_GPU_CLOCK, GetModuleHandle(NULL), NULL);
+
+    // VRAM fields
+    hLblVramSize      = CreateWindowExW(0, L"STATIC", L"Size", WS_CHILD|WS_VISIBLE|SS_LEFT,
+                                        0,0,0,0, hwnd, (HMENU)IDC_LBL_VRAM_SIZE, GetModuleHandle(NULL), NULL);
+    hBoxVramSize      = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD|WS_VISIBLE|ES_READONLY,
+                                        0,0,0,0, hwnd, (HMENU)IDC_BOX_VRAM_SIZE, GetModuleHandle(NULL), NULL);
+    hLblVramType      = CreateWindowExW(0, L"STATIC", L"Type", WS_CHILD|WS_VISIBLE|SS_LEFT,
+                                        0,0,0,0, hwnd, (HMENU)IDC_LBL_VRAM_TYPE, GetModuleHandle(NULL), NULL);
+    hBoxVramType      = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD|WS_VISIBLE|ES_READONLY,
+                                        0,0,0,0, hwnd, (HMENU)IDC_BOX_VRAM_TYPE, GetModuleHandle(NULL), NULL);
+    hLblVramVendor    = CreateWindowExW(0, L"STATIC", L"Vendor", WS_CHILD|WS_VISIBLE|SS_LEFT,
+                                        0,0,0,0, hwnd, (HMENU)IDC_LBL_VRAM_VENDOR, GetModuleHandle(NULL), NULL);
+    hBoxVramVendor    = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD|WS_VISIBLE|ES_READONLY,
+                                        0,0,0,0, hwnd, (HMENU)IDC_BOX_VRAM_VENDOR, GetModuleHandle(NULL), NULL);
+    hLblVramBusWidth  = CreateWindowExW(0, L"STATIC", L"Bus Width", WS_CHILD|WS_VISIBLE|SS_LEFT,
+                                        0,0,0,0, hwnd, (HMENU)IDC_LBL_VRAM_BUS_WIDTH, GetModuleHandle(NULL), NULL);
+    hBoxVramBusWidth  = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD|WS_VISIBLE|ES_READONLY,
+                                        0,0,0,0, hwnd, (HMENU)IDC_BOX_VRAM_BUS_WIDTH, GetModuleHandle(NULL), NULL);
+
+    // Layout once to place group boxes before filling contents
+    Layout(hwnd);
+
+    // Fill GPU fields
+    char tmpA[256];
+    if (get_gpu_name(tmpA, sizeof(tmpA))) {
+        wchar_t tmpW[256]; mbstowcs(tmpW, tmpA, 255); tmpW[255] = L'\0';
+        SetWindowTextW(hBoxGpuName, tmpW);
+    } else {
+        SetWindowTextW(hBoxGpuName, L"Unknown");
+    }
+    if (get_gpu_board_manufacturer(tmpA, sizeof(tmpA))) {
+        wchar_t tmpW[256]; mbstowcs(tmpW, tmpA, 255); tmpW[255] = L'\0';
+        SetWindowTextW(hBoxGpuBoard, tmpW);
+    } else {
+        SetWindowTextW(hBoxGpuBoard, L"Unknown");
+    }
+    if (get_gpu_tdp(tmpA, sizeof(tmpA))) {
+        wchar_t tmpW[64]; mbstowcs(tmpW, tmpA, 63); tmpW[63] = L'\0';
+        SetWindowTextW(hBoxGpuTdp, tmpW);
+    } else {
+        SetWindowTextW(hBoxGpuTdp, L"Unknown");
+    }
+    if (get_gpu_base_clock(tmpA, sizeof(tmpA))) {
+        wchar_t tmpW[64]; mbstowcs(tmpW, tmpA, 63); tmpW[63] = L'\0';
+        SetWindowTextW(hBoxGpuClock, tmpW);
+    } else {
+        SetWindowTextW(hBoxGpuClock, L"Unknown");
+    }
+
+    // Fill VRAM fields
+    if (get_vram_size(tmpA, sizeof(tmpA))) {
+        wchar_t tmpW[64]; mbstowcs(tmpW, tmpA, 63); tmpW[63] = L'\0';
+        SetWindowTextW(hBoxVramSize, tmpW);
+    } else {
+        SetWindowTextW(hBoxVramSize, L"Unknown");
+    }
+    if (get_vram_type(tmpA, sizeof(tmpA))) {
+        wchar_t tmpW[64]; mbstowcs(tmpW, tmpA, 63); tmpW[63] = L'\0';
+        SetWindowTextW(hBoxVramType, tmpW);
+    } else {
+        SetWindowTextW(hBoxVramType, L"Unknown");
+    }
+    if (get_vram_vendor(tmpA, sizeof(tmpA))) {
+        wchar_t tmpW[64]; mbstowcs(tmpW, tmpA, 63); tmpW[63] = L'\0';
+        SetWindowTextW(hBoxVramVendor, tmpW);
+    } else {
+        SetWindowTextW(hBoxVramVendor, L"Unknown");
+    }
+    if (get_vram_bus_width(tmpA, sizeof(tmpA))) {
+        wchar_t tmpW[64]; mbstowcs(tmpW, tmpA, 63); tmpW[63] = L'\0';
+        SetWindowTextW(hBoxVramBusWidth, tmpW);
+    } else {
+        SetWindowTextW(hBoxVramBusWidth, L"Unknown");
+    }
+
+    // Final layout update to position the filled controls
+    Layout(hwnd);
+}
+
 static void ShowBlankTab(HWND hwnd) {
     DestroyCpuControls();
     DestroyMainboardControls();
     DestroyMemoryControls();
+    DestroyGraphicsControls();
 }
 
 static void ShowCpuTab(HWND hwnd) {
@@ -579,6 +795,7 @@ static void SwitchTab(HWND hwnd, int sel) {
     DestroyCpuControls();
     DestroyMainboardControls();
     DestroyMemoryControls();
+    DestroyGraphicsControls();
 
     if (sel == 0) {
         ShowCpuTab(hwnd);
@@ -586,6 +803,8 @@ static void SwitchTab(HWND hwnd, int sel) {
         ShowMainboardTab(hwnd);
     } else if (sel == 2) {
         ShowMemoryTab(hwnd);
+    } else if (sel == 3) {
+        ShowGraphicsTab(hwnd);
     } else {
         ShowBlankTab(hwnd);
     }
